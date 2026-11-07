@@ -1,0 +1,11 @@
+/* Placeholder pages and the dev-only design-system page */
+.ao-placeholder { display: grid; gap: var(--ao-space-4); max-width: 48rem; }
+.ao-stack { display: grid; gap: var(--ao-space-5); }
+.ao-grid-2 { display: grid; gap: var(--ao-space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+.ao-row { display: flex; flex-wrap: wrap; gap: var(--ao-space-3); align-items: center; }
+.ao-swatches { display: grid; gap: var(--ao-space-3); grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
+.ao-swatch { border: var(--ao-border-width) solid var(--ao-border); border-radius: var(--ao-radius-md); overflow: hidden; background: var(--ao-surface); font-size: var(--ao-text-xs); }
+.ao-swatch__chip { height: 2.5rem; border-bottom: var(--ao-border-width) solid var(--ao-border); }
+.ao-swatch__meta { padding: var(--ao-space-2) var(--ao-space-3); }
+.ao-swatch__meta code { font-family: var(--ao-font-mono); color: var(--ao-ink-muted); }
+.ao-fixture-banner { padding: var(--ao-space-3) var(--ao-space-4); border: var(--ao-border-width) dashed var(--ao-purple); border-radius: var(--ao-radius-md); background: var(--ao-purple-soft); font-size: var(--ao-text-sm); }
