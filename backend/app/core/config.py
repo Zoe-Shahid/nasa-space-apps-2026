@@ -50,18 +50,27 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: str) -> str:
+        if isinstance(value, str):
+            value = value.strip().strip("'\"").strip()
         if value.startswith("postgres://"):
             value = "postgresql://" + value[len("postgres://"):]
         try:
             parts = urlsplit(value)
         except Exception:
             parts = None
-        if parts and parts.hostname and ("neon.tech" in parts.hostname):
-            query_params = parse_qs(parts.query, keep_blank_values=True)
-            if "sslmode" not in query_params:
-                query_params["sslmode"] = ["require"]
-                new_query = urlencode(query_params, doseq=True)
-                value = urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
+        if parts and parts.hostname:
+            placeholder_hosts = {"your_neon_host", "your_host", "host_here", "example.com"}
+            if parts.hostname.lower() in placeholder_hosts or "placeholder" in parts.hostname.lower():
+                raise ValueError(
+                    f"database_url contains placeholder hostname '{parts.hostname}'. "
+                    "Configure a valid PostgreSQL connection string in Render Environment."
+                )
+            if "neon.tech" in parts.hostname or "render.com" in parts.hostname:
+                query_params = parse_qs(parts.query, keep_blank_values=True)
+                if "sslmode" not in query_params:
+                    query_params["sslmode"] = ["require"]
+                    new_query = urlencode(query_params, doseq=True)
+                    value = urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
         try:
             parsed_url = make_url(value)
         except (ArgumentError, TypeError, ValueError) as error:

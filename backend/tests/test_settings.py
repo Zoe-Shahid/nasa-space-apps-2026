@@ -97,6 +97,22 @@ def test_standard_database_url_env_var_supported(monkeypatch) -> None:
     assert "sslmode=require" in settings.database_url
 
 
+def test_database_url_strips_quotes_and_whitespace() -> None:
+    settings = Settings(
+        database_url='  "postgres://user:pass@ep-xyz.aws.neon.tech/db"  ',
+        _env_file=None,
+    )
+    assert settings.database_url == "postgresql://user:pass@ep-xyz.aws.neon.tech/db?sslmode=require"
+
+
+def test_database_url_rejects_placeholder_host() -> None:
+    with pytest.raises(ValueError, match="placeholder hostname"):
+        Settings(
+            database_url="postgres://user:pass@YOUR_NEON_HOST/db",
+            _env_file=None,
+        )
+
+
 def test_cors_origins_flexible_parsing() -> None:
     from_str = Settings(cors_origins="https://astroorbitx.netlify.app", _env_file=None)
     assert from_str.cors_origins == ["https://astroorbitx.netlify.app"]
