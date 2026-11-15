@@ -22,6 +22,17 @@ npm test
 npm run build
 ```
 
+## Manual Netlify Drop deployment
+
+The production build uses `VITE_API_BASE_URL` from `.env.production`; this is a public API origin embedded in the static JavaScript bundle, not a secret. From `frontend/`, run:
+
+```sh
+npm ci
+npm run build
+```
+
+Upload the generated `dist/` folder to Netlify Drop. The `public/_redirects` rule is copied into `dist/` so BrowserRouter routes work on refresh. After Netlify assigns the site's domain, allow that exact HTTPS origin in the Render backend's `ASTROORBITX_CORS_ORIGINS` JSON-array setting. Do not use a wildcard origin.
+
 The client uses the shared `src/data/http.ts` transport and strict adapters in `authApi.ts` and `measurementsApi.ts`. The old synthetic profile adapter remains only for isolated legacy/demo paths and is not used by the actual-user workflows. The active application does not seed synthetic measurements into accounts.
 
 ## Limits
