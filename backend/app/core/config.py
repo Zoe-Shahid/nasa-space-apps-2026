@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: str) -> str:
+        if value.startswith("postgres://"):
+            value = "postgresql://" + value[len("postgres://"):]
         try:
             parsed_url = make_url(value)
         except (ArgumentError, TypeError, ValueError) as error:

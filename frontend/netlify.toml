@@ -4,3 +4,14 @@ publish = "dist"
 
 [build.environment]
 NODE_VERSION = "22"
+
+[[redirects]]
+from = "/api/*"
+to = "https://astroorbitx-nasa-space-apps-2026-ckge.onrender.com/api/:splat"
+status = 200
+force = true
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
