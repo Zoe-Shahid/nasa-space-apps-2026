@@ -15,6 +15,10 @@ DEFAULT_CORS_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+# Deployed frontend origin — always allowed so CORS works in production
+# without requiring ASTROORBITX_CORS_ORIGINS to be set explicitly.
+NETLIFY_ORIGIN = "https://astroorbitx.netlify.app"
+
 
 class Settings(BaseSettings):
     app_environment: Literal["development", "test", "production"] = "development"
@@ -88,10 +92,13 @@ class Settings(BaseSettings):
     @property
     def effective_cors_origins(self) -> list[str]:
         if self.cors_origins is not None:
-            return self.cors_origins
-        if self.app_environment == "production":
-            return []
-        return DEFAULT_CORS_ORIGINS.copy()
+            # Explicit env var always wins — merge with deployed frontend origin
+            origins = list(self.cors_origins)
+            if NETLIFY_ORIGIN not in origins:
+                origins.append(NETLIFY_ORIGIN)
+            return origins
+        # Always include the deployed Netlify frontend plus local dev origins
+        return [NETLIFY_ORIGIN] + DEFAULT_CORS_ORIGINS.copy()
 
     @property
     def openapi_enabled(self) -> bool:

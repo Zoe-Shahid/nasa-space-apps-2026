@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import DEFAULT_DATABASE_PATH, Settings
+from app.core.config import DEFAULT_DATABASE_PATH, NETLIFY_ORIGIN, Settings
 
 
 def test_default_database_url_uses_backend_data_directory() -> None:
@@ -28,17 +28,17 @@ def test_application_settings_can_be_overridden_by_environment(monkeypatch) -> N
     settings = Settings(_env_file=None)
 
     assert settings.app_environment == "test"
-    assert settings.effective_cors_origins == ["https://frontend.example"]
+    assert "https://frontend.example" in settings.effective_cors_origins
+    assert NETLIFY_ORIGIN in settings.effective_cors_origins
     assert settings.log_level == "DEBUG"
 
 
 def test_default_settings_allow_only_frontend_development_origins() -> None:
     settings = Settings(_env_file=None)
 
-    assert settings.effective_cors_origins == [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ]
+    assert NETLIFY_ORIGIN in settings.effective_cors_origins
+    assert "http://localhost:5173" in settings.effective_cors_origins
+    assert "http://127.0.0.1:5173" in settings.effective_cors_origins
     assert settings.openapi_enabled
 
 
@@ -46,7 +46,8 @@ def test_production_settings_disable_openapi() -> None:
     settings = Settings(app_environment="production", _env_file=None)
 
     assert not settings.openapi_enabled
-    assert settings.effective_cors_origins == []
+    # Netlify origin must always be allowed, even in production
+    assert NETLIFY_ORIGIN in settings.effective_cors_origins
 
 
 @pytest.mark.parametrize(
