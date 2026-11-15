@@ -298,3 +298,31 @@ def test_trends_group_owner_records_by_utc_day_with_empty_gaps(api: TestClient) 
     ]
     too_wide = api.get("/api/v1/me/trends?category=heart_rate&from=2026-11-01&to=2026-12-02")
     assert too_wide.status_code == 422
+
+
+def test_cors_preflight_options_for_allowed_origin(api: TestClient) -> None:
+    response = api.options(
+        "/api/v1/auth/register",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-request-id",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert response.headers["access-control-allow-credentials"] == "true"
+    assert "POST" in response.headers["access-control-allow-methods"]
+
+
+def test_cors_preflight_options_for_unauthorized_origin(api: TestClient) -> None:
+    response = api.options(
+        "/api/v1/auth/register",
+        headers={
+            "Origin": "https://unauthorized.evil.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers

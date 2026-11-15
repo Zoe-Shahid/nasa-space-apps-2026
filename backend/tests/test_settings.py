@@ -69,3 +69,28 @@ def test_invalid_database_url_is_rejected() -> None:
     with pytest.raises(ValidationError) as error:
         Settings(database_url=secret_url, _env_file=None)
     assert "private-password" not in str(error.value)
+
+
+def test_database_url_translates_postgres_scheme() -> None:
+    settings = Settings(
+        database_url="postgres://user:pass@ep-xyz.aws.neon.tech/db?sslmode=require",
+        _env_file=None,
+    )
+    assert settings.database_url.startswith("postgresql://")
+
+
+def test_cors_origins_flexible_parsing() -> None:
+    from_str = Settings(cors_origins="https://astroorbitx.netlify.app", _env_file=None)
+    assert from_str.cors_origins == ["https://astroorbitx.netlify.app"]
+
+    from_csv = Settings(
+        cors_origins="https://astroorbitx.netlify.app, http://localhost:5173",
+        _env_file=None,
+    )
+    assert from_csv.cors_origins == ["https://astroorbitx.netlify.app", "http://localhost:5173"]
+
+    from_json = Settings(
+        cors_origins='["https://astroorbitx.netlify.app"]',
+        _env_file=None,
+    )
+    assert from_json.cors_origins == ["https://astroorbitx.netlify.app"]

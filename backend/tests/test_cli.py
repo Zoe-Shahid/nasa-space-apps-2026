@@ -70,3 +70,29 @@ def test_profile_provisioning_rejects_production_and_invalid_names(tmp_path) -> 
     )
     with pytest.raises(ValueError, match="1 to 120"):
         provision_profile(development, "  ")
+
+
+def test_provision_user_creates_account_and_profile(tmp_path) -> None:
+    from app.cli import provision_user
+    from app.models.users import User
+
+    database_url = f"sqlite:///{(tmp_path / 'user-provision.db').as_posix()}"
+    settings = Settings(app_environment="development", database_url=database_url, _env_file=None)
+    engine = build_engine(settings)
+    Base.metadata.create_all(engine)
+    engine.dispose()
+
+    user_id = provision_user(settings, "provisioned@example.test", "correct-horse-battery-42", "Provisioned Name")
+    assert user_id is not None
+
+    verify_engine = build_engine(settings)
+    try:
+        with build_session_factory(verify_engine)() as session:
+            user = session.get(User, user_id)
+            assert user is not None
+            assert user.email == "provisioned@example.test"
+            profile = session.query(Profile).filter_by(user_id=user_id).one()
+            assert profile.display_name == "Provisioned Name"
+            assert profile.is_synthetic is False
+    finally:
+        verify_engine.dispose()

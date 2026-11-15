@@ -43,6 +43,22 @@ class Settings(BaseSettings):
             raise ValueError("must include a database driver")
         return value
 
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            if not value:
+                return None
+            if value.startswith("[") and value.endswith("]"):
+                try:
+                    import json
+                    return json.loads(value)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
     @field_validator("cors_origins")
     @classmethod
     def validate_cors_origins(cls, origins: list[str] | None) -> list[str] | None:
