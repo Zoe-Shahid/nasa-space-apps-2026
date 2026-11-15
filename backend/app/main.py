@@ -70,6 +70,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = app_engine
         app.state.session_factory = build_session_factory(app_engine)
         try:
+            from app.db.base import Base
+            import app.models.profiles  # noqa: F401
+            import app.models.users  # noqa: F401
+            Base.metadata.create_all(bind=app_engine)
+        except Exception:
+            pass
+        try:
             yield
         finally:
             app_engine.dispose()

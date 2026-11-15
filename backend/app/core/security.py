@@ -97,8 +97,7 @@ def require_same_origin(request: Request) -> None:
         origin_value = f"{parsed.scheme}://{parsed.netloc}"
         expected = f"{request.url.scheme}://{request.url.netloc}"
         allowed = {expected}
-        if request.app.state.settings.app_environment != "production":
-            allowed.update(request.app.state.settings.effective_cors_origins)
+        allowed.update(request.app.state.settings.effective_cors_origins)
         if parsed.scheme not in {"http", "https"} or origin_value not in allowed:
             raise HTTPException(status_code=403)
         if parsed.path or parsed.query or parsed.fragment or origin.rstrip("/") != origin_value:
@@ -124,13 +123,17 @@ def set_session_cookies(request: Request, response, token: str) -> None:
     loopback_development = settings.app_environment == "development" and host in {"localhost", "127.0.0.1", "::1"}
     secure = settings.app_environment == "production" or not loopback_development and settings.app_environment != "test"
     csrf_token = csrf_for_session(token)
+    origin = request.headers.get("origin")
+    is_cross_origin_https = bool(origin and origin.startswith("https://") and not origin.startswith(f"{request.url.scheme}://{request.url.netloc}"))
+    samesite = "none" if is_cross_origin_https else "lax"
+    cookie_secure = secure or (samesite == "none")
     response.set_cookie(
         SESSION_COOKIE,
         token,
         max_age=int(SESSION_LIFETIME.total_seconds()),
         httponly=True,
-        secure=secure,
-        samesite="lax",
+        secure=cookie_secure,
+        samesite=samesite,
         path="/",
     )
     response.set_cookie(
@@ -138,8 +141,8 @@ def set_session_cookies(request: Request, response, token: str) -> None:
         csrf_token,
         max_age=int(SESSION_LIFETIME.total_seconds()),
         httponly=False,
-        secure=secure,
-        samesite="lax",
+        secure=cookie_secure,
+        samesite=samesite,
         path="/",
     )
 
@@ -149,8 +152,12 @@ def clear_session_cookies(request: Request, response) -> None:
     host = request.url.hostname
     loopback_development = settings.app_environment == "development" and host in {"localhost", "127.0.0.1", "::1"}
     secure = settings.app_environment == "production" or not loopback_development and settings.app_environment != "test"
-    response.delete_cookie(SESSION_COOKIE, path="/", secure=secure, httponly=True, samesite="lax")
-    response.delete_cookie(CSRF_COOKIE, path="/", secure=secure, httponly=False, samesite="lax")
+    origin = request.headers.get("origin")
+    is_cross_origin_https = bool(origin and origin.startswith("https://") and not origin.startswith(f"{request.url.scheme}://{request.url.netloc}"))
+    samesite = "none" if is_cross_origin_https else "lax"
+    cookie_secure = secure or (samesite == "none")
+    response.delete_cookie(SESSION_COOKIE, path="/", secure=cookie_secure, httponly=True, samesite=samesite)
+    response.delete_cookie(CSRF_COOKIE, path="/", secure=cookie_secure, httponly=False, samesite=samesite)
 
 
 def login_rate_limited(key: str, now: datetime | None = None) -> bool:
