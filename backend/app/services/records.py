@@ -191,6 +191,10 @@ def create_sleep_record(
 
     values = payload.model_dump()
     values["profile_id"] = profile_id
+    if "duration_value" not in values or values["duration_value"] is None:
+        values["duration_value"] = str(values["duration_minutes"])
+    if "unit" not in values or values["unit"] is None:
+        values["unit"] = "min"
     record, raced = insert_sleep_record(session, values)
     if raced and not _same_sleep(record, payload):
         raise IdempotencyConflict

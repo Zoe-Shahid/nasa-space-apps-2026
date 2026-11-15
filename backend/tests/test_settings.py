@@ -80,6 +80,23 @@ def test_database_url_translates_postgres_scheme() -> None:
     assert settings.database_url.startswith("postgresql://")
 
 
+def test_database_url_neon_auto_appends_sslmode() -> None:
+    settings = Settings(
+        database_url="postgres://user:pass@ep-xyz.aws.neon.tech/db",
+        _env_file=None,
+    )
+    assert settings.database_url == "postgresql://user:pass@ep-xyz.aws.neon.tech/db?sslmode=require"
+
+
+def test_standard_database_url_env_var_supported(monkeypatch) -> None:
+    monkeypatch.delenv("ASTROORBITX_DATABASE_URL", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgres://user:pass@ep-xyz.aws.neon.tech/render_db")
+    settings = Settings(_env_file=None)
+    assert "render_db" in settings.database_url
+    assert settings.database_url.startswith("postgresql://")
+    assert "sslmode=require" in settings.database_url
+
+
 def test_cors_origins_flexible_parsing() -> None:
     from_str = Settings(cors_origins="https://astroorbitx.netlify.app", _env_file=None)
     assert from_str.cors_origins == ["https://astroorbitx.netlify.app"]

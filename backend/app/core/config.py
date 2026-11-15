@@ -1,9 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -21,10 +21,22 @@ NETLIFY_ORIGIN = "https://astroorbitx.netlify.app"
 
 
 class Settings(BaseSettings):
-    app_environment: Literal["development", "test", "production"] = "development"
-    database_url: str = f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
-    cors_origins: list[str] | None = None
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+    app_environment: Literal["development", "test", "production"] = Field(
+        default="development",
+        validation_alias=AliasChoices("ASTROORBITX_APP_ENVIRONMENT", "APP_ENVIRONMENT", "app_environment"),
+    )
+    database_url: str = Field(
+        default=f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}",
+        validation_alias=AliasChoices("ASTROORBITX_DATABASE_URL", "DATABASE_URL", "database_url"),
+    )
+    cors_origins: list[str] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("ASTROORBITX_CORS_ORIGINS", "CORS_ORIGINS", "cors_origins"),
+    )
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO",
+        validation_alias=AliasChoices("ASTROORBITX_LOG_LEVEL", "LOG_LEVEL", "log_level"),
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="ASTROORBITX_",
@@ -32,6 +44,7 @@ class Settings(BaseSettings):
         extra="ignore",
         validate_default=True,
         hide_input_in_errors=True,
+        populate_by_name=True,
     )
 
     @field_validator("database_url")
@@ -39,6 +52,16 @@ class Settings(BaseSettings):
     def validate_database_url(cls, value: str) -> str:
         if value.startswith("postgres://"):
             value = "postgresql://" + value[len("postgres://"):]
+        try:
+            parts = urlsplit(value)
+        except Exception:
+            parts = None
+        if parts and parts.hostname and ("neon.tech" in parts.hostname):
+            query_params = parse_qs(parts.query, keep_blank_values=True)
+            if "sslmode" not in query_params:
+                query_params["sslmode"] = ["require"]
+                new_query = urlencode(query_params, doseq=True)
+                value = urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
         try:
             parsed_url = make_url(value)
         except (ArgumentError, TypeError, ValueError) as error:

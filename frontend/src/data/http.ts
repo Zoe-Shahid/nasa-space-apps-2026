@@ -17,9 +17,11 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 /** Base origin from VITE_API_BASE_URL. Product routes add their contract-defined path. */
 export function apiBaseUrl(): string | null {
   const value = import.meta.env.VITE_API_BASE_URL
-  if (typeof value !== 'string' || value.trim() === '') return null
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (trimmed === '' || trimmed === '/' || trimmed === './') return ''
 
-  const base = value.trim().replace(/\/+$/, '')
+  const base = trimmed.replace(/\/+$/, '')
   let url: URL
   try {
     url = new URL(base)
@@ -134,10 +136,14 @@ async function parseErrorResponse(
   })
 }
 
+let cachedCsrfToken: string | null = null
+
 function csrfToken(): string | null {
-  if (typeof document === 'undefined') return null
-  const entry = document.cookie.split('; ').find((cookie) => cookie.startsWith('astroorbitx_csrf='))
-  return entry ? decodeURIComponent(entry.slice('astroorbitx_csrf='.length)) : null
+  if (typeof document !== 'undefined') {
+    const entry = document.cookie.split('; ').find((cookie) => cookie.startsWith('astroorbitx_csrf='))
+    if (entry) return decodeURIComponent(entry.slice('astroorbitx_csrf='.length))
+  }
+  return cachedCsrfToken
 }
 
 /** Shared JSON transport for the session-cookie API. */
@@ -196,6 +202,9 @@ export async function http(path: string, options: HttpOptions = {}, configuredBa
     }
 
     if (!response.ok) throw await parseErrorResponse(response, requestId, options.onRequestId, upstreamSignal, timedOut)
+    const returnedCsrf = response.headers.get('x-csrf-token')
+    if (returnedCsrf) cachedCsrfToken = returnedCsrf
+    if (path === '/api/v1/auth/logout') cachedCsrfToken = null
     const responseRequestId = response.headers.get('x-request-id')
     if (responseRequestId) options.onRequestId?.(responseRequestId)
     if (response.status === 204) {

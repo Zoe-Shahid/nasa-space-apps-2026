@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -5,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_session
 from app.schemas.health import HealthResponse, ReadinessResponse
+
+logger = logging.getLogger("astroorbitx.api")
 
 health_router = APIRouter(tags=["health"])
 REQUEST_ID_HEADER = {
@@ -56,5 +60,6 @@ def readiness_check(
     try:
         session.execute(text("SELECT 1"))
     except SQLAlchemyError as error:
+        logger.error("Database readiness check failed: %s", error, exc_info=True)
         raise HTTPException(status_code=503) from error
     return ReadinessResponse(status="ready", database="available")

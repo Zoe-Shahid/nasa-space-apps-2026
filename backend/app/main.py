@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from http import HTTPStatus
+import logging
 from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, Request
@@ -14,8 +15,10 @@ from app.api.profiles import product_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware, problem_response
-from app.db.session import build_engine, build_session_factory
+from app.db.session import build_engine, build_session_factory, upgrade_database
 from app.schemas.errors import ProblemDetails
+
+logger = logging.getLogger("astroorbitx.api")
 
 
 def _request_id(request: Request) -> str:
@@ -70,12 +73,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = app_engine
         app.state.session_factory = build_session_factory(app_engine)
         try:
-            from app.db.base import Base
-            import app.models.profiles  # noqa: F401
-            import app.models.users  # noqa: F401
-            Base.metadata.create_all(bind=app_engine)
-        except Exception:
-            pass
+            upgrade_database(app_engine, app_settings)
+        except Exception as error:
+            logger.error("Failed to run database migrations on startup: %s", error, exc_info=True)
+            try:
+                from app.db.base import Base
+                import app.models.domain  # noqa: F401
+                import app.models.profiles  # noqa: F401
+                import app.models.users  # noqa: F401
+                Base.metadata.create_all(bind=app_engine)
+            except Exception as create_err:
+                logger.error("Failed to auto-create database tables fallback: %s", create_err, exc_info=True)
         try:
             yield
         finally:
@@ -98,7 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
         allow_headers=["Accept", "Content-Type", "X-Request-ID", "X-CSRF-Token"],
-        expose_headers=["X-Request-ID"],
+        expose_headers=["X-Request-ID", "X-CSRF-Token"],
     )
     app.add_middleware(RequestContextMiddleware)
     app.add_exception_handler(StarletteHTTPException, _http_exception_handler)

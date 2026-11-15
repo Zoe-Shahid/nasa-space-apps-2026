@@ -144,3 +144,10 @@ class SleepRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False, default=utc_now, onupdate=utc_now)
 
     profile: Mapped[Profile] = relationship(back_populates="sleep_records")
+
+    def __init__(self, **kwargs):
+        if "duration_value" not in kwargs and kwargs.get("duration_minutes") is not None and kwargs["duration_minutes"] > 0:
+            kwargs["duration_value"] = str(kwargs["duration_minutes"])
+        if "unit" not in kwargs or kwargs["unit"] is None:
+            kwargs["unit"] = "min"
+        super().__init__(**kwargs)

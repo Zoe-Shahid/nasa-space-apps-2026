@@ -326,3 +326,37 @@ def test_cors_preflight_options_for_unauthorized_origin(api: TestClient) -> None
     )
     assert response.status_code == 400
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_cors_preflight_and_registration_for_deployed_netlify_origin(api: TestClient) -> None:
+    client = TestClient(api.app, base_url="https://testserver")
+    preflight = client.options(
+        "/api/v1/auth/register",
+        headers={
+            "Origin": "https://astroorbitx.netlify.app",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-request-id,x-csrf-token",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "https://astroorbitx.netlify.app"
+    assert preflight.headers["access-control-allow-credentials"] == "true"
+
+    register_res = client.post(
+        "/api/v1/auth/register",
+        json={"email": "netlify-user@example.test", "password": "secure-password-123", "display_name": "Netlify Astronaut"},
+        headers={"Origin": "https://astroorbitx.netlify.app"},
+    )
+    assert register_res.status_code == 201
+    assert "x-csrf-token" in register_res.headers
+    csrf_token = register_res.headers["x-csrf-token"]
+    assert csrf_token
+
+    # Verify mutating route works with the csrf token header and session cookie over HTTPS
+    patch_res = client.patch(
+        "/api/v1/me/profile",
+        json={"display_name": "Updated Astronaut"},
+        headers={"Origin": "https://astroorbitx.netlify.app", "X-CSRF-Token": csrf_token},
+    )
+    assert patch_res.status_code == 200
+    assert patch_res.json()["display_name"] == "Updated Astronaut"

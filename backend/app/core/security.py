@@ -127,6 +127,7 @@ def set_session_cookies(request: Request, response, token: str) -> None:
     is_cross_origin_https = bool(origin and origin.startswith("https://") and not origin.startswith(f"{request.url.scheme}://{request.url.netloc}"))
     samesite = "none" if is_cross_origin_https else "lax"
     cookie_secure = secure or (samesite == "none")
+    response.headers["X-CSRF-Token"] = csrf_token
     response.set_cookie(
         SESSION_COOKIE,
         token,
