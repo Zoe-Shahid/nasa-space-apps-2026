@@ -44,7 +44,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_user_sessions_user_expires", "user_sessions", ["user_id", "expires_at"], unique=False)
 
-    with op.batch_alter_table("profiles", recreate="always") as batch:
+    with op.batch_alter_table("profiles", recreate="auto") as batch:
         batch.drop_constraint(op.f("ck_profiles_ck_profiles_display_name_length"), type_="check")
         batch.drop_constraint(op.f("ck_profiles_ck_profiles_synthetic_only"), type_="check")
         batch.add_column(sa.Column("user_id", sa.Uuid(as_uuid=True), nullable=True))
@@ -62,7 +62,7 @@ def upgrade() -> None:
         batch.create_check_constraint("display_name_length", "length(display_name) BETWEEN 1 AND 120")
     op.execute(text("UPDATE profiles SET updated_at = created_at"))
 
-    with op.batch_alter_table("vital_observations", recreate="always") as batch:
+    with op.batch_alter_table("vital_observations", recreate="auto") as batch:
         batch.drop_constraint("fk_vital_observations_profile_id_profiles", type_="foreignkey")
         batch.drop_constraint(op.f("ck_vital_observations_ck_vital_observations_metric_value_shape"), type_="check")
         batch.drop_constraint(
@@ -114,7 +114,7 @@ def upgrade() -> None:
         unique=False,
     )
 
-    with op.batch_alter_table("sleep_records", recreate="always") as batch:
+    with op.batch_alter_table("sleep_records", recreate="auto") as batch:
         batch.drop_constraint("fk_sleep_records_profile_id_profiles", type_="foreignkey")
         batch.drop_constraint(op.f("ck_sleep_records_ck_sleep_records_positive_duration"), type_="check")
         batch.drop_constraint(op.f("ck_sleep_records_ck_sleep_records_synthetic_only"), type_="check")
@@ -153,7 +153,7 @@ def upgrade() -> None:
             "unit = 'min', updated_at = created_at WHERE duration_value IS NULL"
         )
     )
-    with op.batch_alter_table("sleep_records", recreate="always") as batch:
+    with op.batch_alter_table("sleep_records", recreate="auto") as batch:
         batch.alter_column("duration_value", existing_type=sa.String(length=64), nullable=False)
         batch.alter_column("unit", existing_type=sa.String(length=8), nullable=False)
     op.create_index(
@@ -179,7 +179,7 @@ def downgrade() -> None:
         raise RuntimeError("Cannot downgrade while hour-based sleep records exist.")
 
     op.drop_index("ix_sleep_profile_measured_id", table_name="sleep_records")
-    with op.batch_alter_table("sleep_records", recreate="always") as batch:
+    with op.batch_alter_table("sleep_records", recreate="auto") as batch:
         batch.drop_constraint("fk_sleep_profile_mode", type_="foreignkey")
         batch.drop_constraint(op.f("ck_sleep_records_positive_duration"), type_="check")
         batch.drop_constraint(op.f("ck_sleep_records_positive_duration_value"), type_="check")
@@ -207,7 +207,7 @@ def downgrade() -> None:
 
     op.drop_index("ix_vital_profile_metric_measured", table_name="vital_observations")
     op.drop_index("ix_vital_profile_measured_id", table_name="vital_observations")
-    with op.batch_alter_table("vital_observations", recreate="always") as batch:
+    with op.batch_alter_table("vital_observations", recreate="auto") as batch:
         batch.drop_constraint("fk_vital_profile_mode", type_="foreignkey")
         batch.drop_constraint(op.f("ck_vital_observations_metric_value_shape"), type_="check")
         batch.drop_constraint(op.f("ck_vital_observations_positive_finite_values"), type_="check")
@@ -240,7 +240,7 @@ def downgrade() -> None:
         batch.create_check_constraint("quality_enum", "quality IN ('valid', 'suspect', 'invalid')")
         batch.create_check_constraint("synthetic_only", "is_synthetic IS TRUE")
 
-    with op.batch_alter_table("profiles", recreate="always") as batch:
+    with op.batch_alter_table("profiles", recreate="auto") as batch:
         batch.drop_constraint("fk_profiles_user_id_users", type_="foreignkey")
         batch.drop_constraint("uq_profiles_user_id", type_="unique")
         batch.drop_constraint("uq_profiles_id_synthetic", type_="unique")

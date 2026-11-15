@@ -83,3 +83,16 @@ def test_sqlite_foreign_keys_are_enabled(engine: Engine) -> None:
         enabled = connection.exec_driver_sql("PRAGMA foreign_keys").scalar_one()
 
     assert enabled == 1
+
+
+def test_postgresql_database_url_builds_engine_without_connecting() -> None:
+    settings = Settings(
+        database_url="postgresql://astroorbitx:placeholder@localhost/astroorbitx",
+        _env_file=None,
+    )
+    postgresql_engine = build_engine(settings)
+    try:
+        assert postgresql_engine.dialect.name == "postgresql"
+        assert postgresql_engine.dialect.driver == "psycopg2"
+    finally:
+        postgresql_engine.dispose()
