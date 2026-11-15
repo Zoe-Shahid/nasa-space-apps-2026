@@ -1,10 +1,11 @@
+import hashlib
+import logging
 import secrets
 import uuid
-import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -31,6 +32,7 @@ from app.schemas.auth import AuthResponse, LoginRequest, MeProfileResponse, Prof
 
 auth_router = APIRouter(prefix="/auth", tags=["authentication"])
 me_router = APIRouter(prefix="/me", tags=["authenticated user"])
+logger = logging.getLogger("astroorbitx.auth")
 
 
 def _profile_response(user: User, profile: Profile) -> MeProfileResponse:
@@ -83,6 +85,9 @@ def register(
             session.flush()
     except IntegrityError as error:
         raise HTTPException(status_code=409) from error
+    except SQLAlchemyError as error:
+        logger.error("Database unavailable during user registration: %s", error, exc_info=True)
+        raise HTTPException(status_code=503) from error
     set_session_cookies(request, response, token)
     return AuthResponse(user=UserResponse.model_validate(user), profile=_profile_response(user, profile))
 
@@ -99,22 +104,28 @@ def login(
     attempt_key = hashlib.sha256(f"{payload.email}|{client_address}".encode()).hexdigest()
     if login_rate_limited(attempt_key):
         raise HTTPException(status_code=429)
-    with session.begin():
-        user = session.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
-        if user is None or not verify_password(payload.password, user.password_hash):
-            record_login_failure(attempt_key)
-            raise HTTPException(status_code=401)
-        profile = session.scalar(select(Profile).where(Profile.user_id == user.id, Profile.is_synthetic.is_(False)))
-        if profile is None:
-            raise HTTPException(status_code=401)
-        old_token = request.cookies.get(SESSION_COOKIE)
-        now = utc_now()
-        if old_token:
-            old_session = session.scalar(select(UserSession).where(UserSession.token_hash == hash_session_token(old_token)))
-            if old_session is not None and old_session.revoked_at is None:
-                old_session.revoked_at = now
-        token = _new_session(session, user)
-        session.flush()
+    try:
+        with session.begin():
+            user = session.scalar(select(User).where(User.email == payload.email, User.is_active.is_(True)))
+            if user is None or not verify_password(payload.password, user.password_hash):
+                record_login_failure(attempt_key)
+                raise HTTPException(status_code=401)
+            profile = session.scalar(select(Profile).where(Profile.user_id == user.id, Profile.is_synthetic.is_(False)))
+            if profile is None:
+                raise HTTPException(status_code=401)
+            old_token = request.cookies.get(SESSION_COOKIE)
+            now = utc_now()
+            if old_token:
+                old_session = session.scalar(select(UserSession).where(UserSession.token_hash == hash_session_token(old_token)))
+                if old_session is not None and old_session.revoked_at is None:
+                    old_session.revoked_at = now
+            token = _new_session(session, user)
+            session.flush()
+    except HTTPException:
+        raise
+    except SQLAlchemyError as error:
+        logger.error("Database unavailable during login: %s", error, exc_info=True)
+        raise HTTPException(status_code=503) from error
     clear_login_failures(attempt_key)
     set_session_cookies(request, response, token)
     return AuthResponse(user=UserResponse.model_validate(user), profile=_profile_response(user, profile))

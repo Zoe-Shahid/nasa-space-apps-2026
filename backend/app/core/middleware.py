@@ -79,6 +79,7 @@ class RequestContextMiddleware:
                 raise
             logger.error(
                 "unhandled request failure",
+                exc_info=True,
                 extra={
                     "event": "unhandled_request_failure",
                     "request_id": request_id,

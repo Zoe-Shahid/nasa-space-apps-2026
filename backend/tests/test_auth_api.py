@@ -360,3 +360,41 @@ def test_cors_preflight_and_registration_for_deployed_netlify_origin(api: TestCl
     )
     assert patch_res.status_code == 200
     assert patch_res.json()["display_name"] == "Updated Astronaut"
+
+
+def test_unhandled_exception_retains_cors_headers_for_allowed_origin(api: TestClient) -> None:
+    from sqlalchemy.exc import OperationalError
+    from unittest.mock import patch
+
+    client = TestClient(api.app, base_url="https://testserver")
+
+    with patch("app.api.auth.utc_now", side_effect=RuntimeError("unexpected crash")):
+        res = client.post(
+            "/api/v1/auth/register",
+            json={"email": "crash@example.test", "password": "secure-password-123", "display_name": "Crasher"},
+            headers={"Origin": "https://astroorbitx.netlify.app"},
+        )
+        assert res.status_code == 500
+        assert res.headers["access-control-allow-origin"] == "https://astroorbitx.netlify.app"
+        assert res.headers["access-control-allow-credentials"] == "true"
+
+
+def test_registration_database_failure_returns_503_with_cors_headers(api: TestClient) -> None:
+    from sqlalchemy.exc import OperationalError
+    from unittest.mock import patch
+
+    client = TestClient(api.app, base_url="https://testserver")
+
+    with patch("sqlalchemy.orm.Session.flush", side_effect=OperationalError("connection lost", None, None)):
+        res = client.post(
+            "/api/v1/auth/register",
+            json={"email": "dbfail@example.test", "password": "secure-password-123", "display_name": "DB Fail"},
+            headers={"Origin": "https://astroorbitx.netlify.app"},
+        )
+        assert res.status_code == 503
+        assert res.headers["access-control-allow-origin"] == "https://astroorbitx.netlify.app"
+        assert res.headers["access-control-allow-credentials"] == "true"
+        data = res.json()
+        assert data["status"] == 503
+        assert data["title"] == "Service Unavailable"
+
