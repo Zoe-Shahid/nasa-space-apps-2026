@@ -137,7 +137,7 @@ def test_production_disables_openapi_routes(tmp_path: Path) -> None:
             "/api/v1/auth/register",
             json={"email": "production@example.test", "password": "correct-horse-battery-42", "display_name": "Test"},
             headers={"Origin": "http://testserver"},
-        ).status_code == 404
+        ).status_code == 201
 
 
 def test_uvicorn_default_host_is_loopback() -> None:

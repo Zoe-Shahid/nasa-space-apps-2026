@@ -65,8 +65,6 @@ def register(
     response: Response,
     session: Session = Depends(get_session),
 ) -> AuthResponse:
-    if request.app.state.settings.app_environment == "production":
-        raise HTTPException(status_code=404)
     require_same_origin(request)
     now = utc_now()
     user = User(id=uuid.uuid4(), email=payload.email, password_hash=hash_password(payload.password), created_at=now, updated_at=now)
